@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+
+import os
+import re
+
+
+def search_files(directory, extension):
+    extension = extension.lower()
+    results = {}
+    for dirpath, dirnames, files in os.walk(directory, followlinks=True):
+        for name in files:
+            if name.lower().endswith(extension):
+                results[name] = os.path.join(dirpath, name)
+    return results
+
+
+def parse_desktop_file(d):
+    with open(d) as f:
+        name = cmd = term = ""
+        for line in f:
+            if "NoDisplay=true" in line:
+                return
+            elif name == "" and "Name=" in line:
+                name = line[5:len(line)-1]
+            elif cmd == "" and "Exec=" in line:
+                cmd = re.sub("%\\w", "", line[5:len(line)-1])
+            elif term == "" and "Terminal=true" in line:
+                term = True
+        return (name, cmd, term)
+
+
+if __name__ == "__main__":
+    xdg_data_dirs = os.environ["XDG_DATA_DIRS"]  \
+        if "XDG_DATA_DIRS" in os.environ         \
+        else "/usr/local/share/:/usr/share/"
+    xdg_data_home = os.environ["XDG_DATA_HOME"]  \
+        if "XDG_DATA_HOME" in os.environ         \
+        else os.environ["HOME"] + "/.local/share/applications"
+
+    dirs = []
+    for d in xdg_data_dirs.split(':') + [xdg_data_home]:
+        dirs.append(d + "/applications")
+
+    files = {}
+    for d in dirs:
+        files |= search_files(d, ".desktop")
+
+    apps = {}
+    for f in files.values():
+        app = parse_desktop_file(f)
+        if l:
+            [name, cmd, term] = app
+            apps[name] = [cmd, term]
+
+    try:
+        dmenu = "echo \"" + "\n".join(sorted(apps.keys())) + "\" | dmenu -i"
+        selection = os.popen(dmenu).read()[:-1]
+        cmd = ""
+        if selection in apps:
+            term = os.environ["TERMINAL"] + " "  \
+                if apps[selection][1] is True    \
+                else ""
+            cmd = term + apps[selection][0]
+        else:
+            cmd = selection
+        os.system(cmd + " &")
+    except KeyError:
+        exit()
