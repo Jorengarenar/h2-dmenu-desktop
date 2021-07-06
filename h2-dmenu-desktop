@@ -49,7 +49,7 @@ if __name__ == "__main__":
     apps = {}
     for f in files.values():
         app = parse_desktop_file(f)
-        if l:
+        if app:
             [name, cmd, term] = app
             apps[name] = [cmd, term]
 
